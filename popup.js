@@ -1,145 +1,226 @@
-function getCurrentHost(cb) {
-  chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
-    const tab = tabs && tabs[0];
-    let host = '';
-    if (tab && tab.url) {
-      try { host = new URL(tab.url).hostname.toLowerCase(); } catch(_) {}
-    }
-    cb(host);
+// popup.js - Aligns with the actual popup.html structure
+
+// Update status badge display
+function updateStatus(enabled) {
+  const statusElement = document.getElementById('status');
+  if (enabled) {
+    statusElement.textContent = '🟢 ACTIVE';
+    statusElement.className = 'status active';
+  } else {
+    statusElement.textContent = '⚫ INACTIVE';
+    statusElement.className = 'status inactive';
+  }
+}
+
+// Load statistics from storage
+function loadStatistics() {
+  chrome.storage.local.get(['detectionHistory'], (result) => {
+    const history = result.detectionHistory || [];
+
+    // Filter last 24 hours
+    const dayAgo = Date.now() - (24 * 60 * 60 * 1000);
+    const recent = history.filter(d => d.timestamp > dayAgo);
+
+    // Calculate stats
+    const totalEvents = recent.length;
+    const highSeverity = recent.filter(d =>
+      d.severity === 'High' || d.severity === 'Critical'
+    ).length;
+
+    // Update UI
+    document.getElementById('totalEvents').textContent = totalEvents;
+    document.getElementById('highSeverity').textContent = highSeverity;
   });
 }
 
-function updateStatus() {
-  const enabled = document.getElementById('enabled').checked;
-  const statusElement = document.getElementById('status');
-  statusElement.innerHTML = enabled
-    ? '<span class="protected">✅ Protegido</span>'
-    : '<span class="disabled">❌ Desactivado</span>';
-}
+// Load whitelist and display
+function loadWhitelist() {
+  chrome.storage.sync.get(['whitelistPatterns'], (result) => {
+    const patterns = result.whitelistPatterns || [];
+    const container = document.getElementById('whitelistItems');
 
-function hostMatchesPattern(host, pat) {
-  if (pat.startsWith('*.')) {
-    const base = pat.slice(2);
-    return host === base || host.endsWith('.' + base);
-  }
-  return host === pat;
-}
-
-function computeListStatus(host, wl, bl) {
-  const inW = wl.some(p => hostMatchesPattern(host, p));
-  const inB = bl.some(p => hostMatchesPattern(host, p));
-  if (inB && inW) return 'En ambas (prioriza Negra)';
-  if (inB) return 'Lista Negra';
-  if (inW) return 'Lista Blanca';
-  return 'Ninguna';
-}
-
-function refreshListStatus() {
-  getCurrentHost(function(host) {
-    if (!host) {
-      document.getElementById('currentHost').textContent = '(no disponible)';
-      document.getElementById('listStatus').textContent = '-';
+    if (patterns.length === 0) {
+      container.innerHTML = '<div style="color: #666; text-align: center; padding: 10px; font-size: 12px;">No whitelisted domains</div>';
       return;
     }
-    document.getElementById('currentHost').textContent = host;
-    chrome.storage.sync.get(['whitelistPatterns', 'blacklistPatterns'], function(res) {
-      const wl = Array.isArray(res.whitelistPatterns) ? res.whitelistPatterns : [];
-      const bl = Array.isArray(res.blacklistPatterns) ? res.blacklistPatterns : [];
-      document.getElementById('listStatus').textContent = computeListStatus(host, wl, bl);
+
+    container.innerHTML = patterns.map(pattern => `
+      <div class="whitelist-item">
+        <span>${pattern}</span>
+        <button data-pattern="${pattern}">×</button>
+      </div>
+    `).join('');
+
+    // Add remove handlers
+    container.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const pattern = btn.getAttribute('data-pattern');
+        removeFromWhitelist(pattern);
+      });
     });
   });
 }
 
-// Inicializa toggles y estado
-document.addEventListener('DOMContentLoaded', function() {
-  chrome.storage.sync.get([
-    'enabled', 'spoofUserAgent', 'spoofTimezone', 'spoofWebGL', 'spoofCanvas',
-    // NEW:
-    'spoofScreen', 'spoofHardware',
-    'whitelistPatterns', 'blacklistPatterns'
-  ], function(result) {
-    document.getElementById('enabled').checked = result.enabled !== false;
-    document.getElementById('spoofUserAgent').checked = result.spoofUserAgent === true;
-    document.getElementById('spoofTimezone').checked = result.spoofTimezone === true;
-    document.getElementById('spoofWebGL').checked = result.spoofWebGL !== false;
-    document.getElementById('spoofCanvas').checked = result.spoofCanvas !== false;
-    // NEW defaults
-    document.getElementById('spoofScreen').checked = result.spoofScreen === true;
-    document.getElementById('spoofHardware').checked = result.spoofHardware === true;
+// Add domain to whitelist
+function addToWhitelist(domain) {
+  if (!domain || domain.trim() === '') return;
 
-    refreshListStatus();
-    updateStatus();
-  });
+  chrome.storage.sync.get(['whitelistPatterns'], (result) => {
+    const patterns = result.whitelistPatterns || [];
 
-  const toggles = [
-    'enabled', 'spoofUserAgent', 'spoofTimezone', 'spoofWebGL', 'spoofCanvas',
-    // NEW toggles wired
-    'spoofScreen', 'spoofHardware'
-  ];
-  toggles.forEach(id => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('change', function() {
-      const settings = {};
-      toggles.forEach(t => {
-        const node = document.getElementById(t);
-        if (node) settings[t] = node.checked;
-      });
-      chrome.runtime.sendMessage({ action: 'updateSettings', settings }, function(resp) {
-        if (resp && resp.success) {
-          updateStatus();
-          chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-            if (tabs && tabs[0]) chrome.tabs.reload(tabs[0].id);
-          });
+    // Avoid duplicates
+    if (patterns.includes(domain)) {
+      return;
+    }
+
+    patterns.push(domain);
+
+    chrome.storage.sync.set({ whitelistPatterns: patterns }, () => {
+      loadWhitelist();
+
+      // Reload current tab if it matches
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+          try {
+            const url = new URL(tabs[0].url);
+            if (url.hostname === domain || url.hostname.endsWith('.' + domain.replace('*.', ''))) {
+              chrome.tabs.reload(tabs[0].id);
+            }
+          } catch (e) {}
         }
       });
     });
   });
+}
 
-  document.getElementById('addWhitelist').addEventListener('click', function() {
-    getCurrentHost(function(host) {
-      if (!host) return;
-      chrome.storage.sync.get(['whitelistPatterns'], function(res) {
-        const wl = Array.isArray(res.whitelistPatterns) ? res.whitelistPatterns : [];
-        if (!wl.some(p => hostMatchesPattern(host, p) || p === host)) wl.push(host);
-        chrome.runtime.sendMessage({ action: 'updateSettings', settings: { whitelistPatterns: Array.from(new Set(wl)) } }, function() {
-          refreshListStatus();
-          chrome.tabs.query({active: true, currentWindow: true}, function(tabs) { if (tabs && tabs[0]) chrome.tabs.reload(tabs[0].id); });
-        });
+// Remove domain from whitelist
+function removeFromWhitelist(pattern) {
+  chrome.storage.sync.get(['whitelistPatterns'], (result) => {
+    const patterns = (result.whitelistPatterns || []).filter(p => p !== pattern);
+
+    chrome.storage.sync.set({ whitelistPatterns: patterns }, () => {
+      loadWhitelist();
+
+      // Reload current tab if it matches
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        if (tabs[0]) {
+          try {
+            const url = new URL(tabs[0].url);
+            if (url.hostname === pattern || url.hostname.endsWith('.' + pattern.replace('*.', ''))) {
+              chrome.tabs.reload(tabs[0].id);
+            }
+          } catch (e) {}
+        }
       });
     });
   });
+}
 
-  document.getElementById('addBlacklist').addEventListener('click', function() {
-    getCurrentHost(function(host) {
-      if (!host) return;
-      chrome.storage.sync.get(['blacklistPatterns'], function(res) {
-        const bl = Array.isArray(res.blacklistPatterns) ? res.blacklistPatterns : [];
-        if (!bl.some(p => hostMatchesPattern(host, p) || p === host)) bl.push(host);
-        chrome.runtime.sendMessage({ action: 'updateSettings', settings: { blacklistPatterns: Array.from(new Set(bl)) } }, function() {
-          refreshListStatus();
-          chrome.tabs.query({active: true, currentWindow: true}, function(tabs) { if (tabs && tabs[0]) chrome.tabs.reload(tabs[0].id); });
-        });
-      });
+// Save settings and reload tab
+function saveSettings(settings) {
+  chrome.storage.sync.set(settings, () => {
+    // Reload current tab
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (tabs[0]) {
+        chrome.tabs.reload(tabs[0].id);
+      }
     });
   });
+}
 
-  document.getElementById('removeFromLists').addEventListener('click', function() {
-    getCurrentHost(function(host) {
-      if (!host) return;
-      chrome.storage.sync.get(['whitelistPatterns', 'blacklistPatterns'], function(res) {
-        const wl = (res.whitelistPatterns || []).filter(p => !hostMatchesPattern(host, p) && p !== host);
-        const bl = (res.blacklistPatterns || []).filter(p => !hostMatchesPattern(host, p) && p !== host);
-        chrome.runtime.sendMessage({ action: 'updateSettings', settings: { whitelistPatterns: wl, blacklistPatterns: bl } }, function() {
-          refreshListStatus();
-          chrome.tabs.query({active: true, currentWindow: true}, function(tabs) { if (tabs && tabs[0]) chrome.tabs.reload(tabs[0].id); });
-        });
-      });
+// Initialize popup
+document.addEventListener('DOMContentLoaded', () => {
+  // Load all settings
+  chrome.storage.sync.get([
+    'enabled',
+    'spoofCanvas',
+    'spoofWebGL',
+    'spoofAudio',
+    'blockWebRTC',
+    'spoofScreen',
+    'spoofHardware',
+    'blockBattery',
+    'blockFonts'
+  ], (result) => {
+    // Set defaults (matching inject.js defaults)
+    const settings = {
+      enabled: result.enabled !== false,
+      spoofCanvas: result.spoofCanvas !== false,
+      spoofWebGL: result.spoofWebGL !== false,
+      spoofAudio: result.spoofAudio !== false,
+      blockWebRTC: result.blockWebRTC !== false,
+      spoofScreen: result.spoofScreen === true, // OFF by default
+      spoofHardware: result.spoofHardware === true, // OFF by default
+      blockBattery: result.blockBattery !== false,
+      blockFonts: result.blockFonts !== false
+    };
+
+    // Update checkboxes
+    Object.keys(settings).forEach(key => {
+      const element = document.getElementById(key);
+      if (element) {
+        element.checked = settings[key];
+      }
     });
+
+    // Update status
+    updateStatus(settings.enabled);
   });
 
-  document.getElementById('openOptions').addEventListener('click', function(e) {
-    e.preventDefault();
-    chrome.runtime.openOptionsPage();
+  // Load statistics and whitelist
+  loadStatistics();
+  loadWhitelist();
+
+  // Add change listeners to all checkboxes
+  const settingIds = [
+    'enabled',
+    'spoofCanvas',
+    'spoofWebGL',
+    'spoofAudio',
+    'blockWebRTC',
+    'spoofScreen',
+    'spoofHardware',
+    'blockBattery',
+    'blockFonts'
+  ];
+
+  settingIds.forEach(id => {
+    const element = document.getElementById(id);
+    if (element) {
+      element.addEventListener('change', () => {
+        const settings = {};
+        settingIds.forEach(settingId => {
+          const el = document.getElementById(settingId);
+          if (el) {
+            settings[settingId] = el.checked;
+          }
+        });
+
+        saveSettings(settings);
+
+        // Update status if main toggle changed
+        if (id === 'enabled') {
+          updateStatus(element.checked);
+        }
+      });
+    }
+  });
+
+  // Whitelist add button
+  document.getElementById('addWhitelist').addEventListener('click', () => {
+    const input = document.getElementById('whitelistInput');
+    const domain = input.value.trim();
+
+    if (domain) {
+      addToWhitelist(domain);
+      input.value = '';
+    }
+  });
+
+  // Add on Enter key
+  document.getElementById('whitelistInput').addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') {
+      document.getElementById('addWhitelist').click();
+    }
   });
 });
