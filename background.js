@@ -250,6 +250,40 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   
+  // NEW: Handle INJECT_MAIN_WORLD requests for MV3 script injection
+  if (request.type === 'INJECT_MAIN_WORLD' && sender.tab) {
+    (async () => {
+      try {
+        const [settings, whitelist, blacklist, msgId] = request.args || [];
+
+        // Inject into main world using chrome.scripting API
+        await chrome.scripting.executeScript({
+          target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] },
+          world: 'MAIN',
+          files: ['inject.js']
+        });
+
+        // Now initialize with settings
+        await chrome.scripting.executeScript({
+          target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] },
+          world: 'MAIN',
+          func: (settings, whitelist, blacklist, msgId) => {
+            if (typeof initializeProtection === 'function') {
+              initializeProtection(settings, whitelist, blacklist, msgId);
+            }
+          },
+          args: [settings, whitelist, blacklist, msgId]
+        });
+
+        sendResponse({ success: true });
+      } catch (error) {
+        console.error('MV3 injection failed:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
+  }
+
   // Handle fingerprinting detection alerts - support both legacy and new message types
   // OLD: request.action === 'fingerprintingDetected'
   if ((request.action === 'fingerprintingDetected' || request.type === 'FINGERPRINTING_DETECTED') && sender.tab) {
