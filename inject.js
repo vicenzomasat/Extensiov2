@@ -604,6 +604,36 @@
   }
 
   /**
+   * Navigator Hardware Info Protection
+   */
+  function patchNavigatorHardware() {
+    if (window.__psNavHardwarePatched__) return;
+    window.__psNavHardwarePatched__ = true;
+
+    // Block deviceMemory
+    if ('deviceMemory' in navigator) {
+      try {
+        Object.defineProperty(navigator, 'deviceMemory', {
+          get: () => 8, // Generic value
+          enumerable: true,
+          configurable: true
+        });
+      } catch {}
+    }
+
+    // Spoof hardwareConcurrency to common value
+    if ('hardwareConcurrency' in navigator) {
+      try {
+        Object.defineProperty(navigator, 'hardwareConcurrency', {
+          get: () => 4, // Generic 4-core
+          enumerable: true,
+          configurable: true
+        });
+      } catch {}
+    }
+  }
+
+  /**
    * WebRTC Protection (page-world)
    */
   function patchWebRTC(mode = 'block') { // 'block' | 'relay'
@@ -668,47 +698,36 @@
         return;
       }
 
-      // Apply patches based on settings
-      if (settings.spoofWebGL) {
-        patchWebGL();
-      }
-      
+      // NOTE: Critical patches (WebRTC, WebGL, Hardware, Battery, DOMGeometry)
+      // are already applied immediately when inject.js loads (see applyEarlyProtections)
+      // This prevents early fingerprinting before settings arrive
+
+      // Apply conditional patches based on settings
       if (settings.spoofCanvas) {
         patchCanvas();
       }
-      
+
       if (settings.spoofAudio) {
         patchAudio();
       }
-      
+
       // New enhanced protections
       if (settings.timingProtection) {
         patchTiming();
       }
-      
+
       if (settings.cssFingerprint) {
         patchMatchMedia();
         patchDPRAndVisualViewport();
       }
-      
+
       if (settings.fontEnumeration) {
         patchFonts();
       }
-      
+
       if (settings.audioFingerprint) {
         patchAudioAnalyser();
       }
-      
-      if (settings.batteryAPI) {
-        patchBattery();
-      }
-      
-      if (settings.blockWebRTC) {
-        patchWebRTC(settings.webrtcMode || 'block');
-      }
-      
-      // DOM geometry is always protected when enabled
-      patchDOMGeometry();
       
       console.log('[Privacy Shield] Fingerprint surface hardening applied');
 
@@ -730,20 +749,28 @@
   // Export initialization function for content script
   window.initializeProtection = initializeProtection;
 
-  // If called directly (not through content script), apply all patches
+  // CRITICAL: Apply essential patches IMMEDIATELY to prevent early fingerprinting
+  // These must run before any page script can capture original APIs
+  (function applyEarlyProtections() {
+    // Always block these immediately for privacy
+    patchNavigatorHardware(); // CPU/RAM leak
+    patchBattery(); // Battery API leak
+    patchWebRTC('block'); // WebRTC IP leak
+    patchWebGL(); // GPU vendor/renderer leak
+    patchDOMGeometry(); // Rect measurements leak
+
+    console.log('[Privacy Shield] Early protections applied');
+  })();
+
+  // If called directly (not through content script), apply all patches for testing
   if (!window.chrome || !window.chrome.runtime) {
-    // Direct execution, apply all patches for testing
-    patchWebGL();
     patchCanvas();
     patchAudio();
-    patchDOMGeometry();
     patchTiming();
     patchMatchMedia();
     patchDPRAndVisualViewport();
     patchFonts();
     patchAudioAnalyser();
-    patchBattery();
-    patchWebRTC('block');
     console.log('[Privacy Shield] Direct fingerprint surface hardening applied');
   }
 })();
