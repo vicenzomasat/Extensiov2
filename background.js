@@ -256,23 +256,45 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       try {
         const [settings, whitelist, blacklist, msgId] = request.args || [];
 
-        // Inject into main world using chrome.scripting API
+        // First, set settings in window object so inject.js can read them
+        await chrome.scripting.executeScript({
+          target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] },
+          world: 'MAIN',
+          func: (settings, whitelist, blacklist, msgId) => {
+            window.__PS_INIT_SETTINGS__ = settings;
+            window.__PS_INIT_WHITELIST__ = whitelist;
+            window.__PS_INIT_BLACKLIST__ = blacklist;
+            window.__PS_INIT_MSGID__ = msgId;
+          },
+          args: [settings, whitelist, blacklist, msgId]
+        });
+
+        // Now inject the main script - it will read from window.__PS_INIT_*
         await chrome.scripting.executeScript({
           target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] },
           world: 'MAIN',
           files: ['inject.js']
         });
 
-        // Now initialize with settings
+        // Call initialization
         await chrome.scripting.executeScript({
           target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] },
           world: 'MAIN',
-          func: (settings, whitelist, blacklist, msgId) => {
-            if (typeof initializeProtection === 'function') {
-              initializeProtection(settings, whitelist, blacklist, msgId);
+          func: () => {
+            if (typeof window.initializeProtection === 'function') {
+              window.initializeProtection(
+                window.__PS_INIT_SETTINGS__,
+                window.__PS_INIT_WHITELIST__,
+                window.__PS_INIT_BLACKLIST__,
+                window.__PS_INIT_MSGID__
+              );
+              // Clean up
+              delete window.__PS_INIT_SETTINGS__;
+              delete window.__PS_INIT_WHITELIST__;
+              delete window.__PS_INIT_BLACKLIST__;
+              delete window.__PS_INIT_MSGID__;
             }
-          },
-          args: [settings, whitelist, blacklist, msgId]
+          }
         });
 
         sendResponse({ success: true });
