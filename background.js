@@ -250,6 +250,62 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     return true;
   }
   
+  // NEW: Handle INJECT_MAIN_WORLD requests for MV3 script injection
+  if (request.type === 'INJECT_MAIN_WORLD' && sender.tab) {
+    (async () => {
+      try {
+        const [settings, whitelist, blacklist, msgId] = request.args || [];
+
+        // First, set settings in window object so inject.js can read them
+        await chrome.scripting.executeScript({
+          target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] },
+          world: 'MAIN',
+          func: (settings, whitelist, blacklist, msgId) => {
+            window.__PS_INIT_SETTINGS__ = settings;
+            window.__PS_INIT_WHITELIST__ = whitelist;
+            window.__PS_INIT_BLACKLIST__ = blacklist;
+            window.__PS_INIT_MSGID__ = msgId;
+          },
+          args: [settings, whitelist, blacklist, msgId]
+        });
+
+        // Now inject the main script - it will read from window.__PS_INIT_*
+        await chrome.scripting.executeScript({
+          target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] },
+          world: 'MAIN',
+          files: ['inject.js']
+        });
+
+        // Call initialization
+        await chrome.scripting.executeScript({
+          target: { tabId: sender.tab.id, frameIds: [sender.frameId || 0] },
+          world: 'MAIN',
+          func: () => {
+            if (typeof window.initializeProtection === 'function') {
+              window.initializeProtection(
+                window.__PS_INIT_SETTINGS__,
+                window.__PS_INIT_WHITELIST__,
+                window.__PS_INIT_BLACKLIST__,
+                window.__PS_INIT_MSGID__
+              );
+              // Clean up
+              delete window.__PS_INIT_SETTINGS__;
+              delete window.__PS_INIT_WHITELIST__;
+              delete window.__PS_INIT_BLACKLIST__;
+              delete window.__PS_INIT_MSGID__;
+            }
+          }
+        });
+
+        sendResponse({ success: true });
+      } catch (error) {
+        console.error('MV3 injection failed:', error);
+        sendResponse({ success: false, error: error.message });
+      }
+    })();
+    return true;
+  }
+
   // Handle fingerprinting detection alerts - support both legacy and new message types
   // OLD: request.action === 'fingerprintingDetected'
   if ((request.action === 'fingerprintingDetected' || request.type === 'FINGERPRINTING_DETECTED') && sender.tab) {

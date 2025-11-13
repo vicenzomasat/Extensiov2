@@ -711,13 +711,14 @@
       patchDOMGeometry();
       
       console.log('[Privacy Shield] Fingerprint surface hardening applied');
-      
-      // Send ACK back to content script
+
+      // Send ACK back to content script with proper session token
       if (msgId) {
+        const sessionToken = settings.__sessionToken || '';
         window.postMessage({
           type: 'PS_ACK',
           id: msgId,
-          __psToken: 'content-script-token' // This should match the token system
+          __psToken: sessionToken
         }, location.origin);
       }
       
