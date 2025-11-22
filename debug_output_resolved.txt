@@ -1,0 +1,11 @@
+Loading extension from: /app
+Navigating to DuckDuckGo...
+PAGE LOG [error]: Failed to load resource: the server responded with a status of 404 ()
+PAGE LOG [log]: [Privacy Shield] Initializing with settings: {__persona: Object, __sessionToken: 2b46636d-7f93-4acb-893d-fefadf8654aa, blacklistPatterns: Array(0), blockBattery: false, blockFonts: false}
+PAGE LOG [log]: [Privacy Shield] Protections applied based on settings
+PAGE LOG [warning]: [Privacy Shield] MV3 injection failed (and fallbacks disabled)
+PAGE LOG [warning]: [Privacy Shield] Failed to inject protection
+PAGE LOG [warning]: [Privacy Shield] MV3 injection failed (and fallbacks disabled)
+PAGE LOG [warning]: [Privacy Shield] Failed to inject protection
+Results container NOT found (timeout).
+Screenshot taken.

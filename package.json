@@ -1,0 +1,26 @@
+{
+  "name": "privacy-shield-extension",
+  "version": "2.0.0",
+  "description": "Extensión para navegadores basados en Chromium que reduce el fingerprinting con cambios mínimos. Incluye listas configurables (Blanca/Negra) para control granular por dominio.",
+  "main": "dist/background.js",
+  "scripts": {
+    "build": "webpack",
+    "watch": "webpack --watch",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vicenzomasat/Extensiov2.git"
+  },
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/chrome": "^0.0.260",
+    "@types/node": "^22.13.4",
+    "copy-webpack-plugin": "^12.0.2",
+    "ts-loader": "^9.5.1",
+    "typescript": "^5.3.3",
+    "webpack": "^5.90.1",
+    "webpack-cli": "^5.1.4"
+  }
+}
