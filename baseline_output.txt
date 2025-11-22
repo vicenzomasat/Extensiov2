@@ -1,0 +1,3 @@
+Navigating to DuckDuckGo...
+Results container NOT found (timeout).
+Screenshot taken.

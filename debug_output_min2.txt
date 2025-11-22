@@ -1,0 +1,19 @@
+Loading extension from: /app
+Navigating to DuckDuckGo...
+PAGE LOG [error]: Failed to load resource: the server responded with a status of 404 ()
+PAGE LOG [log]: [Privacy Shield] Initializing with settings: {__persona: Object, __sessionToken: 1c8fd92b-b7e0-429c-9282-96395d626bb1, blacklistPatterns: Array(0), blockBattery: false, blockFonts: false}
+PAGE LOG [log]: [Privacy Shield] Protections applied based on settings
+PAGE LOG [error]: Refused to load the script 'blob:https://duckduckgo.com/f9ef1f73-2983-49e8-a532-cd85be5bb466' because it violates the following Content Security Policy directive: "script-src 'self' 'wasm-unsafe-eval' 'inline-speculation-rules' http://localhost:* http://127.0.0.1:* chrome-extension://9fda13c1-c435-470f-b3e7-edf2efcbbb19/". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback.
+
+PAGE LOG [error]: Refused to load the script 'blob:https://duckduckgo.com/16ff3e43-4998-4ce1-a5c8-85484aecd694' because it violates the following Content Security Policy directive: "script-src 'self' 'wasm-unsafe-eval' 'inline-speculation-rules' http://localhost:* http://127.0.0.1:* chrome-extension://9fda13c1-c435-470f-b3e7-edf2efcbbb19/". Note that 'script-src-elem' was not explicitly set, so 'script-src' is used as a fallback.
+
+PAGE LOG [error]: Refused to execute inline script because it violates the following Content Security Policy directive: "script-src 'self' 'wasm-unsafe-eval' 'inline-speculation-rules' http://localhost:* http://127.0.0.1:* chrome-extension://9fda13c1-c435-470f-b3e7-edf2efcbbb19/". Either the 'unsafe-inline' keyword, a hash ('sha256-nI3M6HQeVhA8tf1eqId7EoW2f0B2hUNBa8IJ0bJAIiw='), or a nonce ('nonce-...') is required to enable inline execution.
+
+PAGE LOG [error]: Refused to execute inline script because it violates the following Content Security Policy directive: "script-src 'self' 'wasm-unsafe-eval' 'inline-speculation-rules' http://localhost:* http://127.0.0.1:* chrome-extension://9fda13c1-c435-470f-b3e7-edf2efcbbb19/". Either the 'unsafe-inline' keyword, a hash ('sha256-DkKyXmVxUT/66SKSLZ5ad2wL/ea9PaiGyHbeaCX86Wc='), or a nonce ('nonce-...') is required to enable inline execution.
+
+PAGE LOG [warning]: [Privacy Shield] All injection methods failed
+PAGE LOG [warning]: [Privacy Shield] Failed to inject protection
+PAGE LOG [warning]: [Privacy Shield] All injection methods failed
+PAGE LOG [warning]: [Privacy Shield] Failed to inject protection
+Results container NOT found (timeout).
+Screenshot taken.
